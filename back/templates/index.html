@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> FIS Doc Delivery </title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='images/traffic.png') }}">
+</head>
+<body>
+    <div class="container">
+        <h1 class="heading"> FIS Doc Delivery </h1>
+        <img src="{{ url_for('static', filename='images/fis.png') }}" alt="logo" class="logo">
+        <form action="/process" method="post" class="question-form">
+            <label for="user_input">Enter your question:</label>
+            <input type="text" id="user_input" name="user_input" required>
+            <button type="submit">SUBMIT</button>
+        </form>
+
+        {% if user_input %}
+            <div class="result">
+                <h2>Question:</h2>
+                <p>{{ user_input }}</p>
+
+                <h2>Answer:</h2>
+                {% if link %}
+                    <p><a href="{{ link }}" target="_blank">{{ link }}</a></p>
+                {% else %}
+                    <p>{{ predicted_answer }}</p>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="mario-wrapper">
+        <img class="mario" src="{{ url_for('static', filename='images/mario.png') }}">
+        <img class="doc" src="{{ url_for('static', filename='images/doc4.png') }}">
+      </div>
+      
+      
+</body>
+</html>
