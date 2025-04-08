@@ -7,3 +7,103 @@ https://drive.google.com/file/d/1Z6Hb-FjqBhmGX787OydvgUrqpIbF0_qi/view?usp=shari
 https://we.tl/t-WkbwyIP4J7
 
 https://drive.google.com/drive/folders/1as01EpUWrrjDaoiD0PhP8VwCrxj9pI1M?usp=sharing (full project)
+
+
+
+
+
+
+
+
+from flask import Flask, render_template, request
+from transformers import GPT2LMHeadModel, GPT2Tokenizer
+from flask_cors import CORS
+import re
+import torch
+
+app = Flask(__name__)
+CORS(app)
+
+# Initialize device (GPU if available)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Load tokenizer and model
+tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+tokenizer.pad_token = tokenizer.eos_token  # Set padding token
+model = GPT2LMHeadModel.from_pretrained("fine_tuned_gpt2_qa").to(device)
+model.eval()  # Set to evaluation mode
+
+def generate_answer(question, max_length=200):
+    """Improved generation function with better URL handling"""
+    input_text = f"Question: {question} Answer:"
+    input_ids = tokenizer.encode(input_text, return_tensors="pt").to(device)
+    
+    # Generate with beam search for better results
+    output = model.generate(
+        input_ids,
+        max_length=max_length,
+        pad_token_id=tokenizer.eos_token_id,
+        num_beams=5,
+        early_stopping=True,
+        no_repeat_ngram_size=2
+    )
+    
+    full_answer = tokenizer.decode(output[0], skip_special_tokens=True)
+    answer = full_answer.split("Answer:")[1].strip()
+    
+    return answer
+
+def extract_link(answer):
+    """Enhanced URL extraction that handles incomplete URLs"""
+    # First try to find a complete URL
+    complete_url = re.search(r'(https?://[^\s)\]]+)', answer)
+    if complete_url:
+        url = complete_url.group(1)
+        # Ensure URL ends properly
+        url = re.sub(r'[,\s\.]+$', '', url)
+        return url
+    
+    # If no complete URL found, try to reconstruct from fragments
+    if "fisglobal.com" in answer:
+        url_parts = re.findall(r'(https?://|fisglobal\.com[/\w\-%\.]*)', answer)
+        if url_parts:
+            reconstructed = ''.join(url_parts)
+            # Clean up any trailing punctuation
+            reconstructed = re.sub(r'[,\s\.]+$', '', reconstructed)
+            return reconstructed
+    
+    return None
+
+@app.route('/')
+def home():
+    return render_template('index.html')
+
+@app.route('/process', methods=['POST'])
+def process():
+    if request.method == 'POST':
+        user_input = request.form['user_input'].strip()
+        if not user_input:
+            return render_template('index.html', 
+                                user_input="", 
+                                predicted_answer="Please enter a question",
+                                link=None)
+        
+        predicted_answer = generate_answer(user_input)
+        link = extract_link(predicted_answer)
+        
+        # If we found a link, prioritize showing it
+        if link:
+            # Clean up the link display
+            clean_link = link.replace('%20', ' ')  # Convert %20 back to spaces for display
+            return render_template('index.html', 
+                                user_input=user_input, 
+                                predicted_answer=clean_link, 
+                                link=link)
+        else:
+            return render_template('index.html', 
+                                user_input=user_input, 
+                                predicted_answer=predicted_answer, 
+                                link=None)
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
